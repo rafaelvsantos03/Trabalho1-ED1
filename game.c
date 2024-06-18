@@ -2,280 +2,615 @@
 #include <stdlib.h>
 #include <string.h>
 
-//Terrenos
-#define PLANICIE 1
-#define MONTANHA 2
-#define FLORESTA 3
 
-//Edificios
-#define RECURSO 1
-#define CAMPOTREINAMENTO 2
-#define LABPESQUISA 3
+// Definições de structs
+typedef struct unidade
+{
+    int tipo; // 1-Explorador, 2-Soldado
+    int x, y;
+    struct unidade *prox;
+} Unidade;
 
-//Unidades
-#define SOLDADO 1
-#define EXPLORADOR 2
+typedef struct hUnidade
+{
+    Unidade *inicio;
+    Unidade *final;
+} HUnidade;
 
-typedef struct terreno{
-  int recurso;
-  int tipo; //1- planicie, 2- montanha, 3- floresta
-}TTerreno;
-typedef struct unidade{
-  int x;
-  int y;
-  int tipo; //1- soldado, 2-explorador
-  struct unidade *prox;
-}TUnidade;
+typedef struct Edificio
+{
+    int tipo; // 1-Edifício de Recursos, 2-Campo de Treinamento, 3-Laboratório de Pesquisa
+    int x, y;
+    struct Edificio *prox;
+} Edificio;
 
-typedef struct edificio{
-  int x;
-  int y;
-  int tipo; // 1-recurso, 2 campo de treinamento, 3 lab pesquisa
-  struct edificio *prox;
-}TEdificio;
+typedef struct hEdificio
+{
+    Edificio *inicio;
+    Edificio *final;
+} HEdificio;
 
-typedef struct alianca{
-  char nome[15];
-  struct alianca *prox;
-}TAlianca;
+typedef struct alianca
+{
+    char nome[15];
+    struct alianca *prox;
+} Alianca;
 
-typedef struct faccao{
-  char nome[15];
-  int precurso;
-  int ppoder;
-  struct faccao *prox;
-  TUnidade *proxu;
-  TEdificio *proxe;
-  TAlianca *proxa;
-}TFaccao;
+typedef struct hAlianca
+{
+    Alianca *inicio;
+    Alianca *final;
+} HAlianca;
 
-void inicializarMapa(TTerreno ***mapa, int r, int c){
-  *mapa = (TTerreno**)malloc(r * sizeof(TTerreno*));
-  if(*mapa == NULL){
-    printf("Erro ao alocar memória\n");
-    exit(EXIT_FAILURE);
-  }
-  for(int i = 0; i < r; i++){
-    (*mapa)[i] = (TTerreno*)malloc(c * sizeof(TTerreno));
-    if((*mapa)[i] == NULL){
-      printf("Erro ao alocar memória\n");
-      exit(EXIT_FAILURE);
+typedef struct Faccao
+{
+    char nome[15];
+    int pontosRecursos;
+    int pontosPoder;
+    int x, y;
+    HUnidade *proxUnidade;
+    HEdificio *proxEdificio;
+    HAlianca *proxAlianca;
+    struct Faccao *prox;
+} Faccao;
+
+typedef struct hFaccao
+{
+    Faccao *inicio;
+    Faccao *final;
+} HFaccao;
+
+typedef struct Mapa
+{
+    int **terreno;
+    int largura, altura;
+} Mapa;
+
+typedef enum
+{
+    TERRENO_PLANO = 1,
+    TERRENO_FLORESTA = 2,
+    TERRENO_MONTANHA = 3
+} TerrenoTipo;
+
+// Prototipos das funções
+Mapa *inicializarMapa(int largura, int altura);
+void gerarMapa(Mapa *mapa);
+void liberarMapa(Mapa *mapa);
+void imprimeMapa(Mapa *mapa);
+void gerarMapa(Mapa *mapa);
+TerrenoTipo mapaObterTerreno(Mapa *mapa, int x, int y);
+
+Faccao *alocaFaccao(char *nome);
+HFaccao *criaFaccao();
+void adicionarFaccao(HFaccao *hFaccao, char *nome);
+void faccaoConstruirEdificio(Faccao *faccao, int tipo, int x, int y);
+void adicionarUnidadeAFaccao(Faccao *faccao, int tipo, int x, int y);
+void faccaoColetaRecursos(Faccao *faccao, const char *nomeFaccao, const int qtdePts);
+Faccao *buscarFaccao(HFaccao *faccoes, const char *nome);
+void faccaoAtk(Faccao *atacante, Faccao *defensora);
+void desalocaFaccao(HFaccao *hFaccao, char *nome);
+void faccaoAdicionarAlianca(HFaccao *hfaccao, const char *nomeFac1, const char *nomeFac2);
+void faccaoWin(HFaccao *faccoes);
+void faccaoMoveUnidade(Faccao *faccao, int novoX, int novoY);
+
+Unidade *alocarUnidade(int tipo, int x, int y);
+HUnidade *criaUnidade();
+void adicionarUnidade(HUnidade *hunidade, int tipo, int x, int y);
+void liberarUnidades(HUnidade *hunidade);
+void removerUnidade(HUnidade *hUnidade, Unidade *unidade);
+
+Edificio *alocarEdificio(int tipo, int x, int y);
+void adicionarEdificio(Faccao *faccao, int tipo, int x, int y);
+void desalocaEdificio(Edificio *edificio);
+void juntarEdificio(HEdificio *ed1, HEdificio *ed2);
+
+HAlianca *criaHAlianca();
+void adicionarAlianca(HFaccao *hfaccao, char *nome);
+
+int main()
+{
+    HFaccao *hfaccao = criaFaccao();      // Cria a lista de facções
+    Mapa *mapa = inicializarMapa(10, 10); // Cria um mapa 10x10
+    gerarMapa(mapa);                      // Gera um mapa aleatório
+
+    // Inicializa algumas facções para o jogo
+    char nome1[9], nome2[9], nome3[9];
+    printf("Informe 3 nomes faccoes: ");
+    scanf("%s", &nome1);
+    scanf("%s", &nome2);
+    scanf("%s", &nome3);
+
+    adicionarFaccao(hfaccao, nome1);
+    adicionarFaccao(hfaccao, nome2);
+    adicionarFaccao(hfaccao, nome3);
+
+    // Loop principal do jogo
+    int escolha = 1;
+    while (escolha != 4)
+    {
+        printf("Escolha uma acao:\n");
+        printf("1. Mover unidade\n");
+        printf("2. Construir edificio\n");
+        printf("3. Atacar faccao\n");
+        printf("4. Sair do jogo\n");
+        printf("-> ");
+        scanf("%d", &escolha);
+
+        switch (escolha)
+        {
+        case 1:
+        {
+            char nomeFaccao[15];
+            int novoX, novoY;
+            printf("Digite o nome da faccao, X e Y: ");
+            scanf("%s %d %d", nomeFaccao, &novoX, &novoY);
+            Faccao *faccao = buscarFaccao(hfaccao, nomeFaccao);
+            if (faccao)
+            {
+                faccaoMoveUnidade(faccao, novoX, novoY);
+                faccaoColetaRecursos(hfaccao, nome1, 10);
+            }
+            break;
+        }
+        case 2:
+        {
+            char nomeFaccao[15];
+            int tipo, x, y;
+            printf("Digite o nome da faccao, tipo de edificio, X e Y: ");
+            scanf("%s %d %d %d", nomeFaccao, &tipo, &x, &y);
+            Faccao *faccao = buscarFaccao(hfaccao, nomeFaccao);
+            if (faccao)
+            {
+                faccaoConstruirEdificio(faccao, tipo, x, y);
+            }
+            break;
+        }
+        case 3:
+        {
+            char nomeAtacante[15], nomeDefensora[15];
+            int x, y;
+            printf("Digite o nome da faccao atacante, nome da faccao defensora, X e Y: ");
+            scanf("%s %s %d %d", nomeAtacante, nomeDefensora, &x, &y);
+            Faccao *atacante = buscarFaccao(hfaccao, nomeAtacante);
+            Faccao *defensora = buscarFaccao(hfaccao, nomeDefensora);
+            if (atacante && defensora)
+            {
+                faccaoAtk(atacante, defensora);
+            }
+            break;
+        }
+        case 4:
+        {
+            printf("Saindo do jogo...\n");
+            liberarMapa(mapa);
+            desalocaFaccao(hfaccao, nome1);
+            desalocaFaccao(hfaccao, nome2);
+            desalocaFaccao(hfaccao, nome3);
+        } break;
+        
+        default:
+        {
+            printf("Escolha inválida. Tente novamente.\n");
+        }
+        }
     }
-    for(int j = 0; j < c; j++){
-      (*mapa)[i][j].tipo = rand() % 3 + 1;
-      (*mapa)[i][j].recurso = 0;
-    }
-  }
+    return 0;
 }
 
-TFaccao* inicializarFaccao() {
-    TFaccao *faccaoA = (TFaccao*)malloc(sizeof(TFaccao));
-    TFaccao *faccaoB = (TFaccao*)malloc(sizeof(TFaccao));
-    if(faccaoA == NULL || faccaoB == NULL){
-        printf("Erro ao alocar memória\n");
-        exit(EXIT_FAILURE);
+// Funções de alocação e manipulação de structs
+
+Faccao *alocaFaccao(char *nome)
+{
+    Faccao *nova = (Faccao *)malloc(sizeof(Faccao));
+    if (nova)
+    {
+        strcpy(nova->nome, nome);
+        nova->pontosRecursos = 0;
+        nova->pontosPoder = 0;
+        nova->x = 0;
+        nova->y = 0;
+        nova->proxUnidade = NULL;
+        nova->proxEdificio = NULL;
+        nova->proxAlianca = NULL;
+        nova->prox = NULL;
     }
-    strcpy(faccaoA->nome, "Faccao A");
-    strcpy(faccaoB->nome, "Faccao B");
-    faccaoA->precurso = 100;
-    faccaoB->precurso = 100;
-    faccaoA->ppoder = 0;
-    faccaoB->ppoder = 0;
-    faccaoA->proxu = NULL;
-    faccaoB->proxu = NULL;
-    faccaoA->proxe = NULL;
-    faccaoB->proxe = NULL;
-    faccaoA->proxa = NULL;
-    faccaoB->proxa = NULL;
-    faccaoA->prox = faccaoB;
-    faccaoB->prox = NULL;
-    return faccaoA;
-}
-void adicionarUnidade(TFaccao *faccao, int x, int y, int tipo){
-  TUnidade *nova = (TUnidade*)malloc(sizeof(TUnidade));
-  if(nova == NULL){
-    printf("Erro ao alocar memoria\n");
-    exit(EXIT_FAILURE);
-  }
-  nova->x = x;
-  nova->y = y;
-  nova->tipo = tipo;
-  nova->prox = faccao->proxu;
-  faccao->proxu = nova;
-}
-void removerUnidade(TFaccao *faccao, int x, int y){
-  TUnidade *aux = faccao->proxu;
-  TUnidade *ant = NULL;
-  while(aux != NULL && (aux->x != x || aux->y != y)){
-    ant = aux;
-    aux = aux->prox;
-  }
-  if(aux == NULL){
-    printf("Unidade nao encontrada\n");
-    return;
-  }
-  if(ant == NULL){
-    faccao->proxu = aux->prox;
-  }else{
-    ant->prox = aux->prox;
-  }
-  free(aux);
-}
-void adicionarEdificio(TFaccao *faccao, int x, int y, int tipo){
-  TEdificio *nova = (TEdificio*)malloc(sizeof(TEdificio));
-  if(nova == NULL){
-    printf("Erro ao alocar memoria\n");
-    exit(EXIT_FAILURE);
-  }
-  nova->x = x;
-  nova->y = y;
-  nova->tipo = tipo;
-  nova->prox = faccao->proxe;
-  faccao->proxe = nova;
-}
-void removerEdificio(TFaccao *faccao, int x, int y){
-  TEdificio *aux = faccao->proxe;
-  TEdificio *ant = NULL;
-  while(aux != NULL && (aux->x != x || aux->y != y)){
-    ant = aux;
-    aux = aux->prox;
-  }
-  if(aux == NULL){
-    printf("Edificio nao encontrado\n");
-    return;
-  }
-  if(ant == NULL){
-    faccao->proxe = aux->prox;
-  }else{
-    ant->prox = aux->prox;
-  }
-  free(aux);
-}
-void moverUnidade(TUnidade *unidade, int x, int y){
-  unidade->x = x;
-  unidade->y = y;
-}
-void coletarRecurso(TTerreno **mapa, TFaccao *faccao, int x, int y, int mapa_linha, int mapa_coluna) {
-    if (x < 0 || y < 0 || x >= mapa_linha || y >= mapa_coluna){
-        printf("Posição inválida\n");
-        return;
-    }
-    if(mapa[x][y].recurso == 0){
-        printf("Não há recurso nessa posição\n");
-        return;
-    }
-    faccao->precurso += mapa[x][y].recurso;
-    mapa[x][y].recurso = 0;
+    return nova;
 }
 
-void construirEdificio(TEdificio **mapa, int x, int y, TFaccao *faccao, int tipo, int mapa_linha, int mapa_coluna){
-  if(x < 0 || y < 0 || x >= mapa_linha || y >= mapa_coluna){
-    printf("Posicao invalida\n");
-    return;
-  }
-  TEdificio *atualTerreno = faccao -> proxe;
-  while(atualTerreno != NULL){
-    if(atualTerreno->x == x && atualTerreno->y == y){
-      printf("Ja existe um edificio nessa posicao\n");
-      return;
+HFaccao *criaFaccao()
+{
+    HFaccao *nova = (HFaccao *)malloc(sizeof(HFaccao));
+    if (nova)
+    {
+        nova->inicio = NULL;
+        nova->final = NULL;
     }
-    atualTerreno = atualTerreno-> prox;
-  }
-  int custo = 0;
-  switch(tipo){
-    case RECURSO:
-      custo = 10;
-      break;
-    case CAMPOTREINAMENTO:
-      custo = 20;
-      break;
-    case LABPESQUISA:
-      custo = 30;
-      break;
-    default:
-      printf("Tipo de edificio invalido\n");
-      return;
-  }
-  if (faccao->precurso < custo){
-    printf("Recursos insuficientes\n");
-    return;
-  }
-  TEdificio *novo = (TEdificio*)malloc(sizeof(TEdificio));
-  if(novo == NULL){
-    printf("Erro ao alocar memoria\n");
-    exit(EXIT_FAILURE);
-  }
-  novo->x = x;
-  novo->y = y;
-  novo->tipo = tipo;
-  novo->prox = faccao->proxe;
-  faccao->proxe = novo;
-  faccao->precurso -= custo;
-  printf("Edificio construido com sucesso\n");
-}
-void Combate(TUnidade *atk, TFaccao *atkf, TUnidade *def, TFaccao *deff, TTerreno *tipo) {
-    printf("Combate entre %s e %s em (%d, %d).\n", atkf->nome, deff->nome, def->x, def->y);
-
-    if (atk->tipo != def->tipo) {
-        printf("As unidades estão em terrenos diferentes. O defensor tem vantagem defensiva.\n");
-    }
-
-    int attacker_damage = atk->tipo == SOLDADO ? 10 : 5;
-    if (tipo->tipo == MONTANHA && atk->tipo != MONTANHA) {
-        attacker_damage -= 2;
-    } else if (tipo->tipo == FLORESTA && atk->tipo != FLORESTA) {
-        attacker_damage += 1;
-    }
-
-    int defender_defense = def->tipo == SOLDADO ? 8 : 3; 
-    if (tipo->tipo == MONTANHA && def->tipo != MONTANHA) {
-        defender_defense += 2;
-    } else if (tipo->tipo == FLORESTA && def->tipo != FLORESTA) {
-        defender_defense -= 1;
-    }
-
-    if (attacker_damage > defender_defense) {
-        printf("%s venceu o combate.\n", atkf->nome);
-        removerUnidade(deff, def->x, def->y);
-    } else {
-        printf("%s venceu o combate.\n", deff->nome);
-        removerUnidade(atkf, atk->x, atk->y);
-    }
-}
-void aumentaPoder(TFaccao *faccao){
-    int poderUnidade = 1;
-    int poderEdificio = 2;
-    int poderTotal = 0;
-    TUnidade *auxu = faccao->proxu;
-    while(auxu != NULL){
-        poderTotal += poderUnidade;
-        auxu = auxu->prox;
-    }
-    TEdificio *auxe = faccao->proxe;
-    while(auxe != NULL){
-        poderTotal += poderEdificio;
-        auxe = auxe->prox;
-    }
-    faccao->ppoder = poderTotal;
+    return nova;
 }
 
-void formaAlianca(TFaccao *faccao1, TFaccao *faccao2){
-    TAlianca *nova = faccao1->proxa;
-    while(nova != NULL){
-        if(nova->prox == faccao2){ // Verifica se o próximo elemento da aliança aponta para faccao2
-            printf("Aliança já existente\n");
+void adicionarFaccao(HFaccao *hFaccao, char *nome)
+{
+    Faccao *nova = alocaFaccao(nome);
+    if (nova)
+    {
+        if (hFaccao->inicio == NULL)
+        {
+            hFaccao->inicio = nova;
+            hFaccao->final = nova;
+        }
+        else
+        {
+            hFaccao->final->prox = nova;
+            hFaccao->final = nova;
+        }
+    }
+}
+
+// Funções relacionadas ao mapa
+// mapa
+Mapa *inicializarMapa(int largura, int altura)
+{
+    // Verificação de alocação de memória omitida para brevidade
+    Mapa *mapa = (Mapa *)malloc(sizeof(Mapa));
+    mapa->largura = largura;
+    mapa->altura = altura;
+    mapa->terreno = (int **)malloc(largura * sizeof(int *));
+    for (int i = 0; i < largura; i++)
+    {
+        mapa->terreno[i] = (int *)malloc(altura * sizeof(int));
+    }
+    return mapa;
+}
+
+// Função para liberar a memória do mapa
+void liberarMapa(Mapa *mapa)
+{
+    for (int i = 0; i < mapa->largura; i++)
+    {
+        free(mapa->terreno[i]);
+    }
+    free(mapa->terreno);
+    free(mapa);
+}
+
+void gerarMapa(Mapa *mapa)
+{
+    srand(time(NULL));
+
+    for (int i = 0; i < mapa->largura; i++)
+    {
+        for (int j = 0; j < mapa->altura; j++)
+        {
+            int tipo = TERRENO_PLANO + (rand() % 3); // Gera um número entre TERRENO_PLANO e TERRENO_MONTANHA
+            mapa->terreno[i][j] = tipo;
+        }
+    }
+}
+
+TerrenoTipo mapaObterTerreno(Mapa *mapa, int x, int y)
+{
+    if (x >= 0 && x < mapa->largura && y >= 0 && y < mapa->altura)
+    {
+        return (TerrenoTipo)mapa->terreno[x][y];
+    }
+    else
+    {
+        return TERRENO_MONTANHA; // Retorna montanha para posições inválidas
+    }
+}
+
+void imprimeMapa(Mapa *mapa)
+{
+    for (int i = 0; i < mapa->largura; i++)
+    {
+        for (int j = 0; j < mapa->altura; j++)
+        {
+            switch (mapa->terreno[i][j])
+            {
+            case TERRENO_PLANO:
+                printf("P ");
+                break;
+            case TERRENO_FLORESTA:
+                printf("F ");
+                break;
+            case TERRENO_MONTANHA:
+                printf("M ");
+                break;
+            default:
+                printf("? ");
+                break;
+            }
+        }
+        printf("\n");
+    }
+}
+
+// Funções relacionadas a edifícios
+Edificio *alocarEdificio(int tipo, int x, int y)
+{
+    Edificio *novo = (Edificio *)malloc(sizeof(Edificio));
+    if (novo)
+    {
+        novo->tipo = tipo;
+        novo->x = x;
+        novo->y = y;
+        novo->prox = NULL;
+    }
+    return novo;
+}
+
+void adicionarEdificio(Faccao *faccao, int tipo, int x, int y)
+{
+    if (faccao != NULL && faccao->proxEdificio != NULL)
+    {
+        Edificio *novo = alocarEdificio(tipo, x, y);
+        if (novo != NULL)
+        {
+            novo->prox = faccao->proxEdificio->inicio;
+            faccao->proxEdificio->inicio = novo;
+        }
+    }
+}
+
+void desalocaEdificio(Edificio *edificio)
+{
+    if (edificio != NULL)
+    {
+        free(edificio);
+    }
+}
+
+void juntarEdificio(HEdificio *ed1, HEdificio *ed2)
+{
+    Edificio *aux = ed2->inicio;
+    while (aux)
+    {
+        adicionarEdificio(NULL, aux->tipo, aux->x, aux->y); // Parâmetros da função corrigidos
+        aux = aux->prox;
+    }
+}
+
+// Funções relacionadas a alianças
+HAlianca *criaHAlianca()
+{
+    HAlianca *nova = (HAlianca *)malloc(sizeof(HAlianca));
+    if (nova)
+    {
+        nova->inicio = NULL;
+        nova->final = NULL;
+    }
+    return nova;
+}
+
+void adicionarAlianca(HFaccao *hfaccao, char *nome)
+{
+    Alianca *novo = (Alianca *)malloc(sizeof(Alianca));
+    if (novo)
+    {
+        strcpy(novo->nome, nome);
+        novo->prox = NULL;
+        if (hfaccao->inicio == NULL)
+        {
+            hfaccao->inicio = novo;
+            hfaccao->final = novo;
+        }
+        else
+        {
+            hfaccao->final->prox = novo;
+            hfaccao->final = novo;
+        }
+    }
+}
+
+// Funções de manipulação de facções
+void faccaoConstruirEdificio(Faccao *faccao, int tipo, int x, int y)
+{
+    adicionarEdificio(faccao, tipo, x, y);
+}
+
+void adicionarUnidadeAFaccao(Faccao *faccao, int tipo, int x, int y)
+{
+    if (faccao != NULL && faccao->proxUnidade != NULL)
+    {
+        Unidade *nova = (Unidade *)malloc(sizeof(Unidade));
+        if (nova != NULL)
+        {
+            nova->tipo = tipo;
+            nova->x = x;
+            nova->y = y;
+            nova->prox = faccao->proxUnidade->inicio;
+            faccao->proxUnidade->inicio = nova;
+        }
+    }
+}
+
+void faccaoColetaRecursos(Faccao *faccao, const char *nomeFaccao, const int qtdePts)
+{
+    if (faccao != NULL && strcmp(faccao->nome, nomeFaccao) == 0)
+    {
+        faccao->pontosRecursos += qtdePts;
+    }
+}
+
+Faccao *buscarFaccao(HFaccao *faccoes, const char *nome)
+{
+    Faccao *aux = faccoes->inicio;
+    while (aux != NULL)
+    {
+        if (strcmp(aux->nome, nome) == 0)
+        {
+            return aux;
+        }
+        aux = aux->prox;
+    }
+    return NULL;
+}
+
+void faccaoAtk(Faccao *atacante, Faccao *defensora)
+{
+    if (atacante != NULL && defensora != NULL)
+    {
+        defensora->pontosPoder -= 10; // Exemplo de lógica de ataque
+    }
+}
+
+void desalocaFaccao(HFaccao *hFaccao, char *nome)
+{
+    Faccao *aux = hFaccao->inicio;
+    Faccao *ant = NULL;
+    while (aux != NULL)
+    {
+        if (strcmp(aux->nome, nome) == 0)
+        {
+            if (ant == NULL)
+            {
+                hFaccao->inicio = aux->prox;
+            }
+            else
+            {
+                ant->prox = aux->prox;
+            }
+            free(aux);
             return;
         }
-        nova = nova->prox;
+        ant = aux;
+        aux = aux->prox;
     }
-    TAlianca *novaAlianca = (TAlianca*)malloc(sizeof(TAlianca));
-    if(novaAlianca == NULL){
-        printf("Erro ao alocar memória para a aliança.\n");
+}
+
+void faccaoAdicionarAlianca(HFaccao *hfaccao, const char *nomeFac1, const char *nomeFac2)
+{
+    Faccao *fac1 = buscarFaccao(hfaccao, nomeFac1);
+    Faccao *fac2 = buscarFaccao(hfaccao, nomeFac2);
+    if (fac1 != NULL && fac2 != NULL)
+    {
+        Alianca *novaAlianca = (Alianca *)malloc(sizeof(Alianca));
+        if (novaAlianca != NULL)
+        {
+            strcpy(novaAlianca->nome, nomeFac2);
+            novaAlianca->prox = fac1->proxAlianca->inicio;
+            fac1->proxAlianca->inicio = novaAlianca;
+        }
+    }
+}
+
+void faccaoWin(HFaccao *faccoes)
+{
+    Faccao *aux = faccoes->inicio;
+    Faccao *vencedor = aux;
+    while (aux != NULL)
+    {
+        if (aux->pontosRecursos > vencedor->pontosRecursos)
+        {
+            vencedor = aux;
+        }
+        aux = aux->prox;
+    }
+    printf("A faccao vencedora é: %s\n", vencedor->nome);
+}
+
+void faccaoMoveUnidade(Faccao *faccao, int novoX, int novoY)
+{
+    if (faccao != NULL && faccao->proxUnidade != NULL)
+    {
+        Unidade *unidade = faccao->proxUnidade->inicio;
+        if (unidade != NULL)
+        {
+            unidade->x = novoX;
+            unidade->y = novoY;
+        }
+    }
+}
+
+Unidade *alocarUnidade(int tipo, int x, int y)
+{
+    Unidade *nova = (Unidade *)malloc(sizeof(Unidade));
+    if (nova)
+    {
+        nova->tipo = tipo;
+        nova->x = x;
+        nova->y = y;
+        nova->prox = NULL;
+        return nova;
+    }
+    printf("\nFalha ao alocar memoria");
+    return NULL;
+}
+
+HUnidade *criaUnidade()
+{
+    HUnidade *nova = (HUnidade *)malloc(sizeof(HUnidade));
+    if (nova)
+    {
+        nova->inicio = NULL;
+        nova->final = NULL;
+        return nova;
+    }
+    return NULL;
+}
+
+void adicionarUnidade(HUnidade *hunidade, int tipo, int x, int y)
+{
+    Unidade *nova = alocarUnidade(tipo, x, y);
+    if (nova)
+    {
+        nova->prox = hunidade->inicio;
+        hunidade->inicio = nova;
+    }
+}
+
+void moverUnidade(Unidade *unidade, int novoX, int novoY)
+{
+    unidade->x = novoX;
+    unidade->y = novoY;
+}
+
+void removerUnidade(HUnidade *hunidade, Unidade *unidade)
+{
+    if (hunidade == NULL || unidade == NULL)
+    {
         return;
     }
-    novaAlianca->prox = faccao2; // Armazena o ponteiro para a faccao2
-    novaAlianca->prox = faccao1->proxa;
-    faccao1->proxa = novaAlianca;
+    Unidade *anterior = NULL;
+    Unidade *atual = hunidade->inicio;
+    while (atual != NULL)
+    {
+        if (atual == unidade)
+        {
+            if (anterior == NULL)
+            {
+                hunidade->inicio = atual->prox;
+            }
+            else
+            {
+                anterior->prox = atual->prox;
+            }
+            if (atual == hunidade->final)
+            {
+                hunidade->final = anterior;
+            }
+            free(atual);
+            return;
+        }
+        anterior = atual;
+        atual = atual->prox;
+    }
+}
 
-    printf("Aliança formada entre %s e %s.\n", faccao1->nome, faccao2->nome);
+void liberarUnidades(HUnidade *hunidade)
+{
+    if (hunidade == NULL)
+    {
+        return;
+    }
+    Unidade *atual = hunidade->inicio;
+    Unidade *prox;
+    while (atual != NULL)
+    {
+        prox = atual->prox; // Guarda a referência para o próximo elemento
+        free(atual);        // Libera a unidade atual
+        atual = prox;       // Avança para o próximo elemento
+    }
+    free(hunidade); // Libera a lista de unidades
 }
